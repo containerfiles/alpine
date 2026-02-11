@@ -1,0 +1,6 @@
+# Build artifacts
+*.log
+*.tmp
+
+# macOS
+.DS_Store
