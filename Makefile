@@ -3,6 +3,7 @@ HOST_DIR := /tmp/container/$(IMAGE_NAME)
 TTY_FLAG := --tty
 VOLUMES := --volume "$(HOST_DIR):/mnt/shared"
 HEALTH_TIMEOUT := 10
+BUILD_TIMEOUT := 120
 
 -include container.conf
 
@@ -80,14 +81,14 @@ _dns_check:
 _build_check:
 	@if ! container image list 2>/dev/null | grep -qw '$(IMAGE_NAME)'; then \
 		echo "\033[33mImage '$(IMAGE_NAME)' not found. Building...\033[0m"; \
-		container build --no-cache --tag "$(IMAGE_NAME)" .; \
+		perl -e 'alarm shift; exec @ARGV' $(BUILD_TIMEOUT) container build --no-cache --tag "$(IMAGE_NAME)" .; \
 	fi
 
 # ============================================================
 # Build
 # ============================================================
 build: _pulse
-	container build --no-cache --tag "$(IMAGE_NAME)" .
+	@perl -e 'alarm shift; exec @ARGV' $(BUILD_TIMEOUT) container build --no-cache --tag "$(IMAGE_NAME)" .
 
 # ============================================================
 # Run
@@ -143,17 +144,17 @@ dns: _dns_check
 # Nuke (reset builder)
 # ============================================================
 nuke:
-	@echo "Force killing builder processes..."
-	pkill -9 -f 'buildkit' || true
+	@echo "Force killing builder processes by PID..."
+	@ps aux | grep -E 'container (build|builder|system)|buildkit|container-runtime-linux' | grep -v grep | awk '{print $$2}' | xargs kill -9 2>/dev/null || true
 	@sleep 2
-	@echo "Deleting builder..."
-	container builder delete --force || true
-	@echo "Restarting container system..."
-	container system start || true
-	@sleep 2
-	@echo "Starting builder with 4GB memory..."
-	container builder start --memory 4G
-	container builder status
+	@echo "Restarting builder..."
+	@container builder start --memory 4G >/dev/null 2>&1 &
+	@sleep 5
+	@if perl -e 'alarm shift; exec @ARGV' 10 container builder status >/dev/null 2>&1; then \
+		echo "\033[32mBuilder recovered\033[0m"; \
+	else \
+		echo "\033[31mBuilder still unresponsive\033[0m"; \
+	fi
 
 # ============================================================
 # Help
