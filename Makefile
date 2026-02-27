@@ -7,8 +7,10 @@ BUILD_TIMEOUT := 120
 
 -include container.conf
 
+BIN_DIR := /usr/local/bin
+
 .DEFAULT_GOAL := help
-.PHONY: status build run mcp stop clean dns nuke help pulse _pulse _dns_check _build_check
+.PHONY: status build run mcp stop clean dns nuke help pulse cast install uninstall health _pulse _dns_check _build_check
 
 # ============================================================
 # Status
@@ -91,6 +93,45 @@ build: _pulse
 	@perl -e 'alarm shift; exec @ARGV' $(BUILD_TIMEOUT) container build --no-cache --tag "$(IMAGE_NAME)" .
 
 # ============================================================
+# Cast (standalone binary)
+# ============================================================
+cast: _pulse _build_check
+	@echo "Casting $(IMAGE_NAME)..."
+	@container cast . --image "$(IMAGE_NAME)" -it -o $(IMAGE_NAME)
+	@echo "\033[32mCast complete!\033[0m"
+
+# ============================================================
+# Install (copy cast binary to /usr/local/bin)
+# ============================================================
+install: cast
+	@mkdir -p $(BIN_DIR)
+	@if [ -f $(BIN_DIR)/$(IMAGE_NAME) ]; then rm $(BIN_DIR)/$(IMAGE_NAME); fi
+	@cp $(IMAGE_NAME) $(BIN_DIR)/$(IMAGE_NAME)
+	@echo "\033[32mInstalled $(IMAGE_NAME) to $(BIN_DIR)\033[0m"
+
+# ============================================================
+# Uninstall
+# ============================================================
+uninstall:
+	@if [ -f $(BIN_DIR)/$(IMAGE_NAME) ]; then \
+		rm $(BIN_DIR)/$(IMAGE_NAME); \
+		echo "\033[32mRemoved $(BIN_DIR)/$(IMAGE_NAME)\033[0m"; \
+	else \
+		echo "\033[33m$(IMAGE_NAME) not installed\033[0m"; \
+	fi
+
+# ============================================================
+# Health
+# ============================================================
+health:
+	@if [ -x $(BIN_DIR)/$(IMAGE_NAME) ]; then \
+		echo "\033[32m$(IMAGE_NAME) installed\033[0m"; \
+	else \
+		echo "\033[33m$(IMAGE_NAME) not installed\033[0m"; \
+		exit 1; \
+	fi
+
+# ============================================================
 # Run
 # ============================================================
 run: _pulse _dns_check _build_check
@@ -164,15 +205,19 @@ help:
 	@echo "\033[1mUsage:\033[0m make \033[36m[target]\033[0m"
 	@echo ""
 	@echo "\033[33mTargets:\033[0m"
-	@echo "  \033[36mstatus\033[0m  \033[90m-\033[0m \033[32mShow builder, DNS, images, and containers\033[0m"
-	@echo "  \033[36mbuild\033[0m   \033[90m-\033[0m \033[32mBuild the container image\033[0m"
-	@echo "  \033[36mrun\033[0m     \033[90m-\033[0m \033[32mRun the container\033[0m"
-	@echo "  \033[36mmcp\033[0m     \033[90m-\033[0m \033[32mRun as MCP server (stdio, no tty/volumes)\033[0m"
-	@echo "  \033[36mclean\033[0m   \033[90m-\033[0m \033[32mRemove image and prune unused resources\033[0m"
-	@echo "  \033[36mdns\033[0m     \033[90m-\033[0m \033[32mConfigure .lab DNS domain (run once, needs sudo)\033[0m"
-	@echo "  \033[36mnuke\033[0m    \033[90m-\033[0m \033[32mKill and restart the builder (fixes hangs)\033[0m"
-	@echo "  \033[36mpulse\033[0m \033[90m-\033[0m \033[32mTest if builder can complete a build\033[0m"
-	@echo "  \033[36mhelp\033[0m    \033[90m-\033[0m \033[32mShow this help message (default)\033[0m"
+	@echo "  \033[36mstatus\033[0m     \033[90m-\033[0m \033[32mShow builder, DNS, images, and containers\033[0m"
+	@echo "  \033[36mbuild\033[0m      \033[90m-\033[0m \033[32mBuild the container image\033[0m"
+	@echo "  \033[36mcast\033[0m       \033[90m-\033[0m \033[32mCast into a standalone binary\033[0m"
+	@echo "  \033[36minstall\033[0m    \033[90m-\033[0m \033[32mCast and install to /usr/local/bin\033[0m"
+	@echo "  \033[36muninstall\033[0m  \033[90m-\033[0m \033[32mRemove from /usr/local/bin\033[0m"
+	@echo "  \033[36mhealth\033[0m     \033[90m-\033[0m \033[32mCheck if binary is installed\033[0m"
+	@echo "  \033[36mrun\033[0m        \033[90m-\033[0m \033[32mRun the container\033[0m"
+	@echo "  \033[36mmcp\033[0m        \033[90m-\033[0m \033[32mRun as MCP server (stdio, no tty/volumes)\033[0m"
+	@echo "  \033[36mclean\033[0m      \033[90m-\033[0m \033[32mRemove image and prune unused resources\033[0m"
+	@echo "  \033[36mdns\033[0m        \033[90m-\033[0m \033[32mConfigure .lab DNS domain (run once, needs sudo)\033[0m"
+	@echo "  \033[36mnuke\033[0m       \033[90m-\033[0m \033[32mKill and restart the builder (fixes hangs)\033[0m"
+	@echo "  \033[36mpulse\033[0m      \033[90m-\033[0m \033[32mTest if builder can complete a build\033[0m"
+	@echo "  \033[36mhelp\033[0m       \033[90m-\033[0m \033[32mShow this help message (default)\033[0m"
 	@echo ""
 	@echo "\033[90mNote: build/run auto-recover if builder is hung ($(HEALTH_TIMEOUT)s timeout)\033[0m"
 	@echo ""
