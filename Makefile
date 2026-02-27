@@ -1,5 +1,6 @@
-IMAGE_NAME := $(notdir $(CURDIR))
-HOST_DIR := /tmp/container/$(IMAGE_NAME)
+BIN_NAME := $(notdir $(CURDIR))
+IMAGE_NAME := cf-$(BIN_NAME)
+HOST_DIR := /tmp/container/$(BIN_NAME)
 TTY_FLAG := --tty
 VOLUMES := --volume "$(HOST_DIR):/mnt/shared"
 HEALTH_TIMEOUT := 10
@@ -96,8 +97,8 @@ build: _pulse
 # Cast (standalone binary)
 # ============================================================
 cast: _pulse _build_check
-	@echo "Casting $(IMAGE_NAME)..."
-	@container cast . --image "$(IMAGE_NAME)" -it -o $(IMAGE_NAME)
+	@echo "Casting $(BIN_NAME)..."
+	@container-cast cast . --image "$(IMAGE_NAME)" -it -o $(BIN_NAME)
 	@echo "\033[32mCast complete!\033[0m"
 
 # ============================================================
@@ -105,30 +106,30 @@ cast: _pulse _build_check
 # ============================================================
 install: cast
 	@mkdir -p $(BIN_DIR)
-	@if [ -f $(BIN_DIR)/$(IMAGE_NAME) ]; then rm $(BIN_DIR)/$(IMAGE_NAME); fi
-	@cp $(IMAGE_NAME) $(BIN_DIR)/$(IMAGE_NAME)
-	@rm -f $(IMAGE_NAME)
-	@echo "\033[32mInstalled $(IMAGE_NAME) to $(BIN_DIR)\033[0m"
+	@if [ -f $(BIN_DIR)/$(BIN_NAME) ]; then rm $(BIN_DIR)/$(BIN_NAME); fi
+	@cp $(BIN_NAME) $(BIN_DIR)/$(BIN_NAME)
+	@rm -f $(BIN_NAME)
+	@echo "\033[32mInstalled $(BIN_NAME) to $(BIN_DIR)\033[0m"
 
 # ============================================================
 # Uninstall
 # ============================================================
 uninstall:
-	@if [ -f $(BIN_DIR)/$(IMAGE_NAME) ]; then \
-		rm $(BIN_DIR)/$(IMAGE_NAME); \
-		echo "\033[32mRemoved $(BIN_DIR)/$(IMAGE_NAME)\033[0m"; \
+	@if [ -f $(BIN_DIR)/$(BIN_NAME) ]; then \
+		rm $(BIN_DIR)/$(BIN_NAME); \
+		echo "\033[32mRemoved $(BIN_DIR)/$(BIN_NAME)\033[0m"; \
 	else \
-		echo "\033[33m$(IMAGE_NAME) not installed\033[0m"; \
+		echo "\033[33m$(BIN_NAME) not installed\033[0m"; \
 	fi
 
 # ============================================================
 # Health
 # ============================================================
 health:
-	@if [ -x $(BIN_DIR)/$(IMAGE_NAME) ]; then \
-		echo "\033[32m$(IMAGE_NAME) installed\033[0m"; \
+	@if [ -x $(BIN_DIR)/$(BIN_NAME) ]; then \
+		echo "\033[32m$(BIN_NAME) installed\033[0m"; \
 	else \
-		echo "\033[33m$(IMAGE_NAME) not installed\033[0m"; \
+		echo "\033[33m$(BIN_NAME) not installed\033[0m"; \
 		exit 1; \
 	fi
 
@@ -137,21 +138,21 @@ health:
 # ============================================================
 run: _pulse _dns_check _build_check
 	@mkdir -p "$(HOST_DIR)"
-	@echo "Spawning ephemeral shell at \033[36m$(IMAGE_NAME).lab\033[0m"
-	container run $(strip --remove --name $(IMAGE_NAME) --interactive $(TTY_FLAG) $(VOLUMES) $(PORTS) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
+	@echo "Spawning ephemeral shell at \033[36m$(BIN_NAME).lab\033[0m"
+	container run $(strip --remove --name $(BIN_NAME) --interactive $(TTY_FLAG) $(VOLUMES) $(PORTS) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
 
 # ============================================================
 # MCP (stdio mode for MCP servers)
 # ============================================================
 mcp: _pulse _build_check
-	@container run $(strip --remove --name $(IMAGE_NAME) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
+	@container run $(strip --remove --name $(BIN_NAME) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
 
 # ============================================================
 # Stop
 # ============================================================
 stop:
 	@echo "Single containers exit with Ctrl+C"
-	@echo "To force stop: container stop $(IMAGE_NAME)"
+	@echo "To force stop: container stop $(BIN_NAME)"
 
 # ============================================================
 # Clean
