@@ -107,6 +107,7 @@ install: cast
 	@mkdir -p $(BIN_DIR)
 	@if [ -f $(BIN_DIR)/$(IMAGE_NAME) ]; then rm $(BIN_DIR)/$(IMAGE_NAME); fi
 	@cp $(IMAGE_NAME) $(BIN_DIR)/$(IMAGE_NAME)
+	@rm -f $(IMAGE_NAME)
 	@echo "\033[32mInstalled $(IMAGE_NAME) to $(BIN_DIR)\033[0m"
 
 # ============================================================
