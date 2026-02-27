@@ -11,7 +11,7 @@ BUILD_TIMEOUT := 120
 BIN_DIR := /usr/local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: status build run mcp stop clean dns nuke help pulse cast install uninstall health _pulse _dns_check _build_check
+.PHONY: status build run mcp stop clean help pulse cast install uninstall health _pulse _build_check
 
 # ============================================================
 # Status
@@ -23,21 +23,6 @@ status:
 	@echo ""
 	@echo "\033[33mBuilder:\033[0m"
 	@container builder status
-	@echo ""
-	@echo "\033[33mDNS Domain:\033[0m"
-	@container system property get dns.domain
-	@echo ""
-	@echo "\033[33mHost DNS (.lab):\033[0m"
-	@if container system dns list 2>/dev/null | grep -q '^lab$$'; then \
-		echo "  Container DNS: \033[32mactive\033[0m"; \
-	else \
-		echo "  Container DNS: \033[31mnot configured\033[0m"; \
-	fi
-	@if [ -f /etc/resolver/lab ]; then \
-		echo "  Host resolver: \033[32m/etc/resolver/lab exists\033[0m"; \
-	else \
-		echo "  Host resolver: \033[31mmissing\033[0m (run 'make dns')"; \
-	fi
 	@echo ""
 	@echo "\033[33mImages:\033[0m"
 	@container image list --verbose
@@ -62,23 +47,8 @@ _pulse:
 	@if perl -e 'alarm shift; exec @ARGV' $(HEALTH_TIMEOUT) container builder status >/dev/null 2>&1; then \
 		echo "\033[32mBuilder OK\033[0m"; \
 	else \
-		echo "\033[31mBuilder not responding. Running nuke and clean...\033[0m"; \
-		$(MAKE) nuke; \
-		$(MAKE) clean; \
-		echo ""; \
-	fi
-
-_dns_check:
-	@if ! container system dns list 2>/dev/null | grep -q '^lab$$'; then \
-		echo "\033[33mSetting up .lab DNS domain (first-time setup)...\033[0m"; \
-		sudo container system dns create lab; \
-	fi
-	@if [ "$$(container system property get dns.domain 2>/dev/null)" != "lab" ]; then \
-		container system property set dns.domain lab >/dev/null 2>&1; \
-	fi
-	@if [ ! -f /etc/resolver/lab ]; then \
-		echo "\033[33mCreating /etc/resolver/lab...\033[0m"; \
-		echo "domain lab\nsearch lab\nnameserver 127.0.0.1\nport 2053" | sudo tee /etc/resolver/lab >/dev/null; \
+		echo "\033[31mBuilder not responding\033[0m"; \
+		exit 1; \
 	fi
 
 _build_check:
@@ -136,9 +106,8 @@ health:
 # ============================================================
 # Run
 # ============================================================
-run: _pulse _dns_check _build_check
+run: _pulse _build_check
 	@mkdir -p "$(HOST_DIR)"
-	@echo "Spawning ephemeral shell at \033[36m$(BIN_NAME).lab\033[0m"
 	container run $(strip --remove --name $(BIN_NAME) --interactive $(TTY_FLAG) $(VOLUMES) $(PORTS) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
 
 # ============================================================
@@ -171,35 +140,6 @@ clean:
 	@echo "\033[32mDone!\033[0m"
 
 # ============================================================
-# DNS setup
-# ============================================================
-dns: _dns_check
-	@echo ""
-	@echo "\033[32mDone!\033[0m Containers will be accessible at \033[36m<container-name>.lab\033[0m"
-	@echo ""
-	@echo "DNS domains:"
-	@container system dns list
-	@echo ""
-	@echo "Resolver file:"
-	@cat /etc/resolver/lab 2>/dev/null || echo "(not found)"
-
-# ============================================================
-# Nuke (reset builder)
-# ============================================================
-nuke:
-	@echo "Force killing builder processes by PID..."
-	@ps aux | grep -E 'container (build|builder|system)|buildkit|container-runtime-linux' | grep -v grep | awk '{print $$2}' | xargs kill -9 2>/dev/null || true
-	@sleep 2
-	@echo "Restarting builder..."
-	@container builder start --memory 4G >/dev/null 2>&1 &
-	@sleep 5
-	@if perl -e 'alarm shift; exec @ARGV' 10 container builder status >/dev/null 2>&1; then \
-		echo "\033[32mBuilder recovered\033[0m"; \
-	else \
-		echo "\033[31mBuilder still unresponsive\033[0m"; \
-	fi
-
-# ============================================================
 # Help
 # ============================================================
 help:
@@ -207,7 +147,7 @@ help:
 	@echo "\033[1mUsage:\033[0m make \033[36m[target]\033[0m"
 	@echo ""
 	@echo "\033[33mTargets:\033[0m"
-	@echo "  \033[36mstatus\033[0m     \033[90m-\033[0m \033[32mShow builder, DNS, images, and containers\033[0m"
+	@echo "  \033[36mstatus\033[0m     \033[90m-\033[0m \033[32mShow builder, images, and containers\033[0m"
 	@echo "  \033[36mbuild\033[0m      \033[90m-\033[0m \033[32mBuild the container image\033[0m"
 	@echo "  \033[36mcast\033[0m       \033[90m-\033[0m \033[32mCast into a standalone binary\033[0m"
 	@echo "  \033[36minstall\033[0m    \033[90m-\033[0m \033[32mCast and install to /usr/local/bin\033[0m"
@@ -216,10 +156,6 @@ help:
 	@echo "  \033[36mrun\033[0m        \033[90m-\033[0m \033[32mRun the container\033[0m"
 	@echo "  \033[36mmcp\033[0m        \033[90m-\033[0m \033[32mRun as MCP server (stdio, no tty/volumes)\033[0m"
 	@echo "  \033[36mclean\033[0m      \033[90m-\033[0m \033[32mRemove image and prune unused resources\033[0m"
-	@echo "  \033[36mdns\033[0m        \033[90m-\033[0m \033[32mConfigure .lab DNS domain (run once, needs sudo)\033[0m"
-	@echo "  \033[36mnuke\033[0m       \033[90m-\033[0m \033[32mKill and restart the builder (fixes hangs)\033[0m"
-	@echo "  \033[36mpulse\033[0m      \033[90m-\033[0m \033[32mTest if builder can complete a build\033[0m"
+	@echo "  \033[36mpulse\033[0m      \033[90m-\033[0m \033[32mTest if builder is responsive\033[0m"
 	@echo "  \033[36mhelp\033[0m       \033[90m-\033[0m \033[32mShow this help message (default)\033[0m"
-	@echo ""
-	@echo "\033[90mNote: build/run auto-recover if builder is hung ($(HEALTH_TIMEOUT)s timeout)\033[0m"
 	@echo ""
