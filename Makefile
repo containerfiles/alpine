@@ -2,6 +2,7 @@ IMAGE_NAME := $(notdir $(CURDIR))
 HOST_DIR := /tmp/container/$(IMAGE_NAME)
 TTY_FLAG := --tty
 VOLUMES := --volume "$(HOST_DIR):/mnt/shared"
+MEMORY := 512M
 HEALTH_TIMEOUT := 10
 BUILD_TIMEOUT := 120
 
@@ -82,13 +83,13 @@ build: _pulse
 run: _pulse _dns_check _build_check
 	@mkdir -p "$(HOST_DIR)"
 	@echo "Spawning at \033[36m$(IMAGE_NAME).box\033[0m"
-	container run $(strip --remove --name $(IMAGE_NAME) --interactive $(TTY_FLAG) $(VOLUMES) $(PORTS) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
+	container run $(strip --remove --name $(IMAGE_NAME) --memory $(MEMORY) --interactive $(TTY_FLAG) $(VOLUMES) $(PORTS) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
 
 # ============================================================
 # MCP (stdio mode for MCP servers)
 # ============================================================
 mcp: _pulse _build_check
-	@container run $(strip --remove --name $(IMAGE_NAME) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
+	@container run $(strip --remove --name $(IMAGE_NAME) --memory $(MEMORY) $(ENV_VARS) $(EXTRA_FLAGS)) "$(IMAGE_NAME)"
 
 # ============================================================
 # Stop
